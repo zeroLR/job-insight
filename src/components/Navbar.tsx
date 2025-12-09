@@ -1,13 +1,11 @@
 import React from 'react';
 import { Search, Key } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { saveApiKey } from '../services/db';
 import { useToast } from '../contexts/ToastContext';
 
 export const Navbar: React.FC = () => {
-  const location = useLocation();
   const { showToast } = useToast();
-  const isResultPage = location.pathname.startsWith('/result');
 
   const handleSetApiKey = async () => {
     const key = window.prompt(

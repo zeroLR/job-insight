@@ -32,7 +32,7 @@ let dbPromise: Promise<IDBPDatabase<JobInsightDB>>;
 export const initDB = () => {
   if (!dbPromise) {
     dbPromise = openDB<JobInsightDB>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) {
+      upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           const store = db.createObjectStore('analysis', {
             keyPath: 'id',
