@@ -20,6 +20,7 @@ export const generateAnalysis = async (
   jobTitle: string,
   country: string = '台灣',
   link?: string,
+  model: string = 'gemini-2.5-flash-lite',
 ): Promise<AnalysisResult> => {
   const genAI = await getClient();
 
@@ -43,7 +44,7 @@ export const generateAnalysis = async (
   try {
     // 第一步：檢索資訊
     const searchResult = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: model,
       contents: [{ parts: [{ text: searchPrompt }] }],
       config: {
         tools: [{ googleSearch: {} }],
@@ -125,7 +126,7 @@ export const generateAnalysis = async (
     `;
 
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
+      model: model,
       contents: [{ parts: [{ text: structurePrompt }] }],
       config: {
         responseMimeType: 'application/json',

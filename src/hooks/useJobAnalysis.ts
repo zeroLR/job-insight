@@ -14,6 +14,7 @@ interface AnalysisMeta {
   title: string;
   country?: string;
   link?: string;
+  model?: string;
 }
 
 interface UseJobAnalysisReturn {
@@ -23,6 +24,7 @@ interface UseJobAnalysisReturn {
     country?: string,
     link?: string,
     force?: boolean,
+    model?: string,
   ) => Promise<void>;
   fetchById: (id: string) => Promise<void>;
   data: AnalysisResult | null;
@@ -53,6 +55,7 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
           title: record.title,
           country: record.country,
           link: record.link,
+          model: record.model,
         });
       } else {
         setError('找不到該分析報告');
@@ -72,6 +75,7 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
     country: string = '台灣',
     link?: string,
     force: boolean = false,
+    model: string = 'gemini-2.5-flash-lite',
   ) => {
     setLoading(true);
     setError(null);
@@ -83,6 +87,9 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
       try {
         const cachedResult = await getAnalysis(company, title, country);
         if (cachedResult && !link) {
+          // Note: We don't strictly check model match for cache hit to avoid re-running too often,
+          // but if user explicitly changes model, they might expect new result.
+          // For now, let's assume cache is valid regardless of model unless force is true.
           setData(cachedResult.data);
           setLoading(false);
           navigate(`/result/${cachedResult.id}`);
@@ -111,11 +118,24 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
     }, 1500);
 
     try {
-      const result = await generateAnalysis(company, title, country, link);
+      const result = await generateAnalysis(
+        company,
+        title,
+        country,
+        link,
+        model,
+      );
       setData(result);
-      setMeta({ company, title, country, link });
+      setMeta({ company, title, country, link, model });
       // 儲存結果到 IndexedDB
-      const id = await saveAnalysis(company, title, result, country, link);
+      const id = await saveAnalysis(
+        company,
+        title,
+        result,
+        country,
+        link,
+        model,
+      );
       navigate(`/result/${id}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : '發生未知錯誤';

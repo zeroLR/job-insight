@@ -10,6 +10,7 @@ interface JobInsightDB extends DBSchema {
       title: string;
       country?: string;
       link?: string;
+      model?: string;
       data: AnalysisResult;
       timestamp: number;
     };
@@ -70,6 +71,7 @@ export const saveAnalysis = async (
   data: AnalysisResult,
   country: string = '台灣',
   link?: string,
+  model?: string,
 ) => {
   const db = await initDB();
   const id = crypto.randomUUID();
@@ -79,6 +81,7 @@ export const saveAnalysis = async (
     title,
     country,
     link,
+    model,
     data,
     timestamp: Date.now(),
   });

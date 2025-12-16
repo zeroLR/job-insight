@@ -9,6 +9,7 @@ import {
   Award,
   Search,
   Globe,
+  Cpu,
 } from 'lucide-react';
 import { Card } from '../components/Card';
 import { useJobAnalysis } from '../hooks/useJobAnalysis';
@@ -20,13 +21,21 @@ export const Home: React.FC = () => {
     title: '',
     link: '',
     country: '台灣',
+    model: 'gemini-2.5-flash-lite',
   });
 
   const handleAnalyze = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.company || !formData.title) return;
 
-    analyze(formData.company, formData.title, formData.country, formData.link);
+    analyze(
+      formData.company,
+      formData.title,
+      formData.country,
+      formData.link,
+      false,
+      formData.model,
+    );
   };
 
   if (loading) {
@@ -140,6 +149,32 @@ export const Home: React.FC = () => {
                   setFormData({ ...formData, link: e.target.value })
                 }
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              AI 模型
+            </label>
+            <div className="relative">
+              <Cpu className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+              <select
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none"
+                value={formData.model}
+                onChange={(e) =>
+                  setFormData({ ...formData, model: e.target.value })
+                }
+              >
+                <option value="gemini-2.5-flash-lite">
+                  Gemini 2.5 Flash Lite (快速)
+                </option>
+                <option value="gemini-2.5-flash">
+                  Gemini 2.5 Flash (平衡)
+                </option>
+                <option value="gemini-robotics-er-1.5-preview">
+                  Gemini Robotics ER 1.5 Preview (實驗性)
+                </option>
+              </select>
             </div>
           </div>
 

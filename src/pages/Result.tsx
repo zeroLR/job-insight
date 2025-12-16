@@ -37,7 +37,14 @@ export const Result: React.FC = () => {
   const handleRegenerate = () => {
     if (meta) {
       if (window.confirm('確定要重新生成這份報告嗎？這將會消耗 API 用量。')) {
-        analyze(meta.company, meta.title, meta.country, meta.link, true);
+        analyze(
+          meta.company,
+          meta.title,
+          meta.country,
+          meta.link,
+          true,
+          meta.model,
+        );
       }
     }
   };
