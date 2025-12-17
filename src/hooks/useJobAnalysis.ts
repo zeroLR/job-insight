@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { generateAnalysis } from '../services/gemini';
-import {
-  saveAnalysis,
-  getAnalysis,
-  getAnalysisRecordById,
-} from '../services/db';
+import { ref, get, set } from 'firebase/database';
 import { AnalysisResult } from '../types';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useMasterPassword } from '../contexts/MasterPasswordContext';
+import { getUserReportById } from '../services/reports';
+import { rtdb } from '../services/firebase';
+import { decryptText } from '../utils/crypto';
+import { generateAnalysisWithGenAI } from '../services/genai';
 
 interface AnalysisMeta {
   company: string;
@@ -37,6 +38,8 @@ interface UseJobAnalysisReturn {
 export const useJobAnalysis = (): UseJobAnalysisReturn => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const { masterPassword } = useMasterPassword();
   const [data, setData] = useState<AnalysisResult | null>(null);
   const [meta, setMeta] = useState<AnalysisMeta | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,14 +50,18 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
     setLoading(true);
     setError(null);
     try {
-      const record = await getAnalysisRecordById(id);
+      if (!user) {
+        throw new Error('請先登入');
+      }
+
+      const record = await getUserReportById(user.uid, id);
       if (record) {
         setData(record.data);
         setMeta({
           company: record.company,
           title: record.title,
           country: record.country,
-          link: record.link,
+          link: record.link || undefined,
           model: record.model,
         });
       } else {
@@ -82,22 +89,16 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
     setData(null);
     setMeta(null);
 
-    // 嘗試從 IndexedDB 獲取快取資料
-    if (!force) {
-      try {
-        const cachedResult = await getAnalysis(company, title, country);
-        if (cachedResult && !link) {
-          // Note: We don't strictly check model match for cache hit to avoid re-running too often,
-          // but if user explicitly changes model, they might expect new result.
-          // For now, let's assume cache is valid regardless of model unless force is true.
-          setData(cachedResult.data);
-          setLoading(false);
-          navigate(`/result/${cachedResult.id}`);
-          return;
-        }
-      } catch (err) {
-        console.warn('Failed to retrieve from cache:', err);
-      }
+    if (!user) {
+      setLoading(false);
+      navigate('/login');
+      return;
+    }
+
+    if (!masterPassword) {
+      setLoading(false);
+      showToast('請先解鎖保險箱', 'error');
+      return;
     }
 
     // 模擬進度條文字變化，增加使用者體驗
@@ -118,29 +119,63 @@ export const useJobAnalysis = (): UseJobAnalysisReturn => {
     }, 1500);
 
     try {
-      const result = await generateAnalysis(
+      // 從 RTDB 讀取加密的 API Key
+      const snapshot = await get(ref(rtdb, `users/${user.uid}/apiKey`));
+      if (!snapshot.exists()) {
+        throw new Error('找不到 API Key，請先設定');
+      }
+
+      const encryptedApiKey = snapshot.val() as string;
+
+      // 解密 API Key
+      let decryptedApiKey: string;
+      try {
+        decryptedApiKey = await decryptText(encryptedApiKey, masterPassword);
+      } catch {
+        throw new Error('保險箱密碼錯誤，請重新輸入');
+      }
+
+      if (!force) {
+        // placeholder: server-side caching could be added later
+      }
+
+      // 使用前端 GenAI 生成分析報告
+      const analysisResult = await generateAnalysisWithGenAI({
         company,
-        title,
+        jobTitle: title,
+        apiKey: decryptedApiKey,
         country,
         link,
         model,
-      );
-      setData(result);
+      });
+
+      // 生成報告 ID 並存儲到 RTDB
+      const reportId = crypto.randomUUID();
+      const timestamp = Date.now();
+
+      await set(ref(rtdb, `users/${user.uid}/reports/${reportId}`), {
+        id: reportId,
+        company,
+        title,
+        country,
+        link: link || null,
+        model,
+        data: analysisResult,
+        timestamp,
+      });
+
       setMeta({ company, title, country, link, model });
-      // 儲存結果到 IndexedDB
-      const id = await saveAnalysis(
-        company,
-        title,
-        result,
-        country,
-        link,
-        model,
-      );
-      navigate(`/result/${id}`);
+      navigate(`/result/${reportId}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : '發生未知錯誤';
       setError(message);
       showToast(message, 'error');
+      if (message.includes('請先登入')) {
+        navigate('/login');
+      } else if (message.includes('保險箱密碼錯誤')) {
+        // Clear incorrect password
+        sessionStorage.removeItem('jobinsight_master_password');
+      }
     } finally {
       clearInterval(interval);
       setLoading(false);
