@@ -8,15 +8,44 @@ self.addEventListener('install', (event) => {
       return cache.addAll(urlsToCache);
     }),
   );
+  // Force the waiting service worker to become the active service worker
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip caching for:
+  // 1. Chrome extensions
+  // 2. Non-GET requests
+  // 3. Assets (JS, CSS, images, fonts, etc.) - let Vite handle these
+  if (
+    url.protocol === 'chrome-extension:' ||
+    request.method !== 'GET' ||
+    url.pathname.match(
+      /\.(js|css|png|jpg|jpeg|svg|gif|woff|woff2|ttf|eot|ico|webp|map)$/,
+    )
+  ) {
+    return;
+  }
+
+  // Only cache navigation requests (HTML pages)
   event.respondWith(
-    caches.match(event.request).then((response) => {
+    caches.match(request).then((response) => {
       if (response) {
         return response;
       }
-      return fetch(event.request);
+      return fetch(request).then((fetchResponse) => {
+        // Only cache successful responses
+        if (fetchResponse && fetchResponse.status === 200) {
+          const responseToCache = fetchResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
+        }
+        return fetchResponse;
+      });
     }),
   );
 });
