@@ -24,7 +24,7 @@ export const Result: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { fetchById, analyze, data, meta, loading, error, loadingText } =
+  const { fetchById, data, meta, loading, error, loadingText } =
     useJobAnalysis();
   const { getTask, startAnalysis } = useAnalysisTask();
 
