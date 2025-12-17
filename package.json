@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "deploy": "npm run build && npx wrangler pages deploy dist --project-name job-insight",
+    "deploy": "npm run build && npx wrangler deploy --assets=./dist --name=job-insight --compatibility-date 2025-12-17",
     "firebase:deploy": "firebase deploy"
   },
   "dependencies": {
