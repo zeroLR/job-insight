@@ -1,24 +1,33 @@
 import React from 'react';
 import { Search, Key } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { saveApiKey } from '../services/db';
+import { Link, useNavigate } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
+import { auth } from '../services/firebase';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Navbar: React.FC = () => {
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSetApiKey = async () => {
-    const key = window.prompt(
-      '請輸入您的 Gemini API Key (將儲存於瀏覽器本地端):',
-    );
-    if (key) {
-      try {
-        await saveApiKey(key);
-        showToast('API Key 已儲存', 'success');
-      } catch (error) {
-        console.error(error);
-        showToast('儲存失敗', 'error');
-      }
+  const handleSetApiKey = () => {
+    if (!user) {
+      showToast('請先登入', 'error');
+      navigate('/login');
+      return;
+    }
+    navigate('/setup-key');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      showToast('已登出', 'success');
+      navigate('/login');
+    } catch (error) {
+      console.error(error);
+      showToast('登出失敗', 'error');
     }
   };
 
@@ -34,20 +43,53 @@ export const Navbar: React.FC = () => {
           </span>
         </Link>
         <div className="flex items-center gap-4">
-          <button
-            onClick={handleSetApiKey}
-            className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1"
-            title="設定 API Key"
-          >
-            <Key className="w-4 h-4" />
-            <span className="hidden sm:inline">API Key</span>
-          </button>
-          <Link
-            to="/report-list"
-            className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
-          >
-            結果列表
-          </Link>
+          {user ? (
+            <>
+              <button
+                onClick={handleSetApiKey}
+                className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1"
+                title="設定 API Key"
+              >
+                <Key className="w-4 h-4" />
+                <span className="hidden sm:inline">API Key</span>
+              </button>
+              <Link
+                to="/report-list"
+                className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+              >
+                分析報告
+              </Link>
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
+                {user.photoURL && (
+                  <img
+                    src={user.photoURL}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full border-2 border-slate-200"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <div className="flex flex-col items-start hidden sm:block">
+                  <span className="text-xs font-medium text-slate-700">
+                    {user.displayName || user.email?.split('@')[0]}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+                title="登出"
+              >
+                登出
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/login"
+              className="text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors"
+            >
+              登入
+            </Link>
+          )}
         </div>
       </div>
     </nav>
