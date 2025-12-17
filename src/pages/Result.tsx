@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useJobAnalysis } from '../hooks/useJobAnalysis';
+import { useAnalysisTask } from '../contexts/AnalysisTaskContext';
 import { Card } from '../components/Card';
 import { SectionHeader } from '../components/SectionHeader';
 import { Badge } from '../components/Badge';
@@ -25,26 +26,36 @@ export const Result: React.FC = () => {
 
   const { fetchById, analyze, data, meta, loading, error, loadingText } =
     useJobAnalysis();
+  const { getTask, startAnalysis } = useAnalysisTask();
 
   useEffect(() => {
     if (id) {
-      fetchById(id);
+      // First check if this is an active task
+      const task = getTask(id);
+      if (task && task.status === 'completed' && task.result) {
+        // Use result from task
+        // We need to set this data somehow - for now fetch from DB
+        fetchById(id);
+      } else {
+        // Fetch from database
+        fetchById(id);
+      }
     } else {
       navigate('/');
     }
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
     if (meta) {
       if (window.confirm('確定要重新生成這份報告嗎？這將會消耗 API 用量。')) {
-        analyze(
+        await startAnalysis(
           meta.company,
           meta.title,
-          meta.country,
+          meta.country || '台灣',
           meta.link,
-          true,
-          meta.model,
+          meta.model || 'gemini-3-flash',
         );
+        navigate('/');
       }
     }
   };

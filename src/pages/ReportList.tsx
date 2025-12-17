@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllAnalyses, deleteAnalysis } from '../services/db';
+import {
+  deleteUserReportById,
+  getUserReports,
+  ReportRecord,
+} from '../services/reports';
 import {
   Calendar,
   ChevronRight,
@@ -9,26 +13,25 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
-
-interface ReportItem {
-  id: string;
-  company: string;
-  title: string;
-  country?: string;
-  timestamp: number;
-}
+import { useAuth } from '../contexts/AuthContext';
 
 const ITEMS_PER_PAGE = 10;
 
 export const ReportList: React.FC = () => {
-  const [reports, setReports] = useState<ReportItem[]>([]);
+  const [reports, setReports] = useState<ReportRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const { showToast } = useToast();
+  const { user } = useAuth();
 
   const fetchReports = async () => {
     try {
-      const data = await getAllAnalyses();
+      if (!user) {
+        setReports([]);
+        return;
+      }
+
+      const data = await getUserReports(user.uid);
       setReports(data);
     } catch (error) {
       console.error('Failed to fetch reports:', error);
@@ -39,16 +42,19 @@ export const ReportList: React.FC = () => {
 
   useEffect(() => {
     fetchReports();
-  }, []);
+  }, [user]);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault(); // Prevent navigation
     if (window.confirm('確定要刪除這份報告嗎？')) {
       try {
-        await deleteAnalysis(id);
+        if (!user) {
+          throw new Error('請先登入');
+        }
+        await deleteUserReportById(user.uid, id);
         showToast('報告已刪除', 'success');
         // Refresh list
-        const data = await getAllAnalyses();
+        const data = await getUserReports(user.uid);
         setReports(data);
         // Adjust page if needed
         if (
