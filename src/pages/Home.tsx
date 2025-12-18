@@ -33,7 +33,7 @@ export const Home: React.FC = () => {
     title: '',
     link: '',
     country: '台灣',
-    model: 'gemini-3-flash',
+    model: 'gemini-2.5-flash',
   });
 
   // Check if there are any tasks to show
@@ -64,7 +64,7 @@ export const Home: React.FC = () => {
         title: '',
         link: '',
         country: '台灣',
-        model: 'gemini-3-flash',
+        model: 'gemini-2.5-flash',
       });
     }
   };
