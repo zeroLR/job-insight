@@ -230,10 +230,10 @@ interface AnalysisResult {
     difficulty: 'Easy' | 'Medium' | 'Hard';
   }[];
   marketData: {
-    salaryRange: {
-      min: number;
-      max: number;
-      avg: number;
+    salaryRange: { // 注意 salary range 需根據實際提供的有效資料來評估
+      min: number; // 約 30 ～ 100
+      max: number; // 約 60 ～ 300
+      avg: number; // 約 40 ～ 250
       currency: string;
     };
     news: {
