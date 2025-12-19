@@ -339,7 +339,7 @@ export const Result: React.FC = () => {
               <p className="text-indigo-200 text-sm mb-1">平均年薪</p>
               <div className="text-4xl font-extrabold tracking-tight">
                 {data.marketData?.salaryRange?.avg}{' '}
-                <span className="text-xl font-medium">萬</span>
+                <span className="text-xl font-medium"></span>
               </div>
               <div className="w-full bg-indigo-800/50 h-2 rounded-full mt-4 mb-2 relative">
                 <div
@@ -349,8 +349,8 @@ export const Result: React.FC = () => {
                 <div className="absolute w-2 h-4 bg-white rounded-full top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 shadow-lg"></div>
               </div>
               <div className="flex justify-between text-xs text-indigo-200 px-2">
-                <span>{data.marketData?.salaryRange?.min}萬</span>
-                <span>{data.marketData?.salaryRange?.max}萬</span>
+                <span>{data.marketData?.salaryRange?.min}</span>
+                <span>{data.marketData?.salaryRange?.max}</span>
               </div>
               <p className="text-xs text-indigo-300 mt-4 text-right">
                 {data.marketData?.salaryRange?.currency}

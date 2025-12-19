@@ -201,21 +201,83 @@ async function performAnalysis(
 
     // Step 1: Search and gather information
     const searchPrompt = `
-請針對「${country}」地區的「${company}」公司之「${jobTitle}」職缺進行全方位分析。
-${link ? `請務必參考此職缺連結內容：${link}` : ''}
-資料來源必須是網路上真實來源，包含新聞報導、財報、職缺描述與社群討論等。
-請善用搜尋工具查找最新資訊，並確保引用正確的來源連結。
-薪資的單位使用當地貨幣 (TWD、HKD、USD 等)，並標明貨幣種類，需符合當地市場行情。
+<task>
+請針對指定地區的公司職缺進行全方位分析，蒐集網路上的真實資料來源。
+</task>
 
-請蒐集以下資訊：
-1. 公司基本資料 (產業、輿論好感度、成長趨勢、官網連結)
-2. 營運策略 (核心策略、獲利來源、未來佈局)
-3. 主要產品 (名稱、描述、連結)
-4. 職缺詳細資訊 (是否遠端、加班狀況、主要職責)
-5. 白板題推薦 (若為技術職缺)
-6. 市場數據 (薪資範圍、相關新聞、社群討論)
-7. 技能需求 (硬實力、軟實力)
-8. 求職建議
+<target>
+  <country>${country}</country>
+  <company>${company}</company>
+  <job_title>${jobTitle}</job_title>
+  ${link ? `<job_link>${link}</job_link>` : ''}
+</target>
+
+<requirements>
+  <data_sources>
+    <source>新聞報導</source>
+    <source>財報資料</source>
+    <source>職缺描述</source>
+    <source>社群討論</source>
+  </data_sources>
+  
+  <guidelines>
+    <guideline>善用搜尋工具查找最新資訊</guideline>
+    <guideline>確保引用正確的來源連結</guideline>
+    ${link ? '<guideline>務必參考職缺連結內容</guideline>' : ''}
+    <guideline>薪資單位使用當地貨幣（TWD、HKD、USD 等）並標明貨幣種類</guideline>
+    <guideline>年薪需符合當地市場行情</guideline>
+    <guideline>若無法取得相關資料，請在回應中說明</guideline>
+  </guidelines>
+</requirements>
+
+<information_to_collect>
+  <category name="公司基本資料">
+    <item>產業</item>
+    <item>輿論好感度</item>
+    <item>成長趨勢</item>
+    <item>官網連結</item>
+  </category>
+  
+  <category name="營運策略">
+    <item>核心策略</item>
+    <item>獲利來源</item>
+    <item>未來佈局</item>
+  </category>
+  
+  <category name="主要產品">
+    <item>名稱</item>
+    <item>描述</item>
+    <item>連結</item>
+  </category>
+  
+  <category name="職缺詳細資訊">
+    <item>是否遠端</item>
+    <item>加班狀況</item>
+    <item>主要職責</item>
+  </category>
+  
+  <category name="白板題推薦" condition="技術職缺">
+    <item>題目標題</item>
+    <item>題目描述</item>
+    <item>難度等級</item>
+  </category>
+  
+  <category name="市場數據">
+    <item>年薪資範圍</item>
+    <item>相關新聞</item>
+    <item>社群討論</item>
+  </category>
+  
+  <category name="技能需求">
+    <item>硬實力</item>
+    <item>軟實力</item>
+  </category>
+  
+  <category name="求職建議">
+    <item>準備步驟</item>
+    <item>建議重點</item>
+  </category>
+</information_to_collect>
 `;
 
     postProgress('搜尋近期新聞與財報...', 30);
@@ -224,7 +286,12 @@ ${link ? `請務必參考此職缺連結內容：${link}` : ''}
       model,
       contents: [{ parts: [{ text: searchPrompt }] }],
       config: {
-        tools: [{ googleSearch: {} }],
+        temperature: 0,
+        tools: [
+          {
+            googleSearch: {},
+          },
+        ],
       },
     });
 
@@ -233,29 +300,103 @@ ${link ? `請務必參考此職缺連結內容：${link}` : ''}
       throw new Error('Failed to fetch search content');
     }
 
+    // 檢查是否有搜尋來源，若信任度低則中斷並提示資訊不足
+    const metadata = searchResult.candidates?.[0]?.groundingMetadata;
+    if (!metadata || !metadata.searchEntryPoint) {
+      throw new Error(
+        '搜尋結果不足，無法生成準確的分析報告。請嘗試提供更詳細的公司名稱或職缺連結。',
+      );
+    }
+
     postProgress('分析職缺關鍵字權重...', 50);
 
     // Step 2: Structure the information into JSON
     const structurePrompt = `
-以下是剛才蒐集到的資訊：
+<task>
+請根據檢索到的資訊，整理成嚴格的 JSON 格式。
+</task>
 
+<output_format>
+  <format_type>JSON</format_type>
+  <schema_language>TypeScript</schema_language>
+</output_format>
+
+<schema>
+interface AnalysisResult {
+  companyProfile: {
+    name: string;
+    industry: string;
+    sentiment: number;
+    growth: string;
+    website?: string;
+  };
+  strategy: {
+    core: string;
+    revenue: string[];
+    future: string;
+  };
+  products: {
+    name: string;
+    description: string;
+    link?: string;
+  }[];
+  jobDetails: {
+    remote: boolean;
+    overtime: boolean;
+    responsibilities: string[];
+  };
+  whiteboard?: {
+    title: string;
+    description: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+  }[];
+  marketData: {
+    salaryRange: {
+      min: number;
+      max: number;
+      avg: number;
+      currency: string;
+    };
+    news: {
+      title: string;
+      source: string;
+      date: string;
+      type: 'positive' | 'negative' | 'neutral';
+      link?: string;
+    }[];
+    discussions: {
+      topic: string;
+      score: number;
+      comment: string;
+      link?: string;
+    }[];
+  };
+  skills: {
+    hard: string[];
+    soft: string[];
+  };
+  advice: {
+    step: number;
+    title: string;
+    desc: string;
+  }[];
+}
+</schema>
+
+<validation_rules>
+  <rule field="marketData.salaryRange">
+    <description>需根據實際提供的有效資料來評估</description>
+    <constraints>
+      <constraint field="min">約 300000 ～ 1000000</constraint>
+      <constraint field="max">約 600000 ～ 3000000</constraint>
+      <constraint field="avg">約 400000 ～ 2500000</constraint>
+    </constraints>
+  </rule>
+</validation_rules>
+
+<input_data>
 ${searchContent}
-
-請根據上述內容，產生結構化的職缺分析報告。請務必確保：
-1. 薪資範圍必須符合「${country}」當地市場行情，使用正確的貨幣單位
-2. 新聞、社群討論必須是真實存在的來源，附上正確的連結
-3. 白板題推薦僅適用於技術類職缺 (例如工程師、資料科學家)，若為非技術職缺則可留空陣列
-4. 每個欄位都要根據實際資訊填寫，不要編造
-
-返回 JSON 格式：
-- companyProfile: 公司基本資料 (name, industry, sentiment 0~100, growth, website)
-- strategy: 營運策略 (core, revenue[], future)
-- products: 主要產品 [{name, description, link?}]
-- jobDetails: 職缺資訊 (remote, overtime, responsibilities[])
-- whiteboard: 白板題推薦 [{title, description, difficulty}]
-- marketData: 市場數據 (salaryRange {min, max, avg, currency}, news[], discussions[])
-- skills: 技能需求 (hard[], soft[])
-- advice: 求職建議 [{step, title, desc}]
+</input_data>
 `;
 
     postProgress('生成面試攻略報告...', 80);

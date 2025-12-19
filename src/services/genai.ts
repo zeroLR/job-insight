@@ -190,7 +190,8 @@ export async function generateAnalysisWithGenAI(
     <guideline>確保引用正確的來源連結</guideline>
     ${link ? '<guideline>務必參考職缺連結內容</guideline>' : ''}
     <guideline>薪資單位使用當地貨幣（TWD、HKD、USD 等）並標明貨幣種類</guideline>
-    <guideline>薪資需符合當地市場行情</guideline>
+    <guideline>年薪需符合當地市場行情</guideline>
+    <guideline>若無法取得相關資料，請在回應中說明</guideline>
   </guidelines>
 </requirements>
 
@@ -227,7 +228,7 @@ export async function generateAnalysisWithGenAI(
   </category>
   
   <category name="市場數據">
-    <item>薪資範圍</item>
+    <item>年薪資範圍</item>
     <item>相關新聞</item>
     <item>社群討論</item>
   </category>
@@ -248,13 +249,27 @@ export async function generateAnalysisWithGenAI(
     model,
     contents: [{ parts: [{ text: searchPrompt }] }],
     config: {
-      tools: [{ googleSearch: {} }],
+      temperature: 0,
+      tools: [
+        {
+          googleSearch: {},
+        },
+      ],
     },
   });
 
   const searchContent = searchResult.text;
   if (!searchContent) {
     throw new Error('Failed to fetch search content');
+  }
+
+  const metadata = searchResult.candidates?.[0]?.groundingMetadata;
+
+  // 檢查是否有搜尋來源，若信任度低則中斷並提示資訊不足
+  if (!metadata || !metadata.searchEntryPoint) {
+    throw new Error(
+      '搜尋結果不足，無法生成準確的分析報告。請嘗試提供更詳細的公司名稱或職缺連結。',
+    );
   }
 
   // Step 2: Structure the information into JSON
@@ -334,9 +349,9 @@ interface AnalysisResult {
   <rule field="marketData.salaryRange">
     <description>需根據實際提供的有效資料來評估</description>
     <constraints>
-      <constraint field="min">約 30 ～ 100</constraint>
-      <constraint field="max">約 60 ～ 300</constraint>
-      <constraint field="avg">約 40 ～ 250</constraint>
+      <constraint field="min">約 300000 ～ 1000000</constraint>
+      <constraint field="max">約 600000 ～ 3000000</constraint>
+      <constraint field="avg">約 400000 ～ 2500000</constraint>
     </constraints>
   </rule>
 </validation_rules>
