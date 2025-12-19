@@ -8,21 +8,36 @@ self.addEventListener('install', (event) => {
       return cache.addAll(urlsToCache);
     }),
   );
-  // Force the waiting service worker to become the active service worker
   self.skipWaiting();
+});
+
+// 清除舊版本的快取
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        }),
+      );
+    }),
+  );
+  return self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip caching for:
-  // 1. Chrome extensions
-  // 2. Non-GET requests
-  // 3. Assets (JS, CSS, images, fonts, etc.) - let Vite handle these
+  // 1. 跳過非 GET 請求與擴充功能
+  if (request.method !== 'GET' || url.protocol === 'chrome-extension:') {
+    return;
+  }
+
+  // 2. 靜態資源 (JS, CSS, Images) 直接走網路 (由 Vite 的 Hash 機制管理)
   if (
-    url.protocol === 'chrome-extension:' ||
-    request.method !== 'GET' ||
     url.pathname.match(
       /\.(js|css|png|jpg|jpeg|svg|gif|woff|woff2|ttf|eot|ico|webp|map)$/,
     )
@@ -30,22 +45,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Only cache navigation requests (HTML pages)
+  // 3. HTML 請求採用 Network First (網路優先)
+  // 這樣可以確保拿到最新的 index.html (指向正確的 JS 檔)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // 成功拿到網路版本，存入快取
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => {
+          // 網路斷線時，才回傳快取版本
+          return caches.match(request);
+        }),
+    );
+    return;
+  }
+
+  // 4. 其他請求嘗試快取優先
   event.respondWith(
     caches.match(request).then((response) => {
-      if (response) {
-        return response;
-      }
-      return fetch(request).then((fetchResponse) => {
-        // Only cache successful responses
-        if (fetchResponse && fetchResponse.status === 200) {
-          const responseToCache = fetchResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
-        }
-        return fetchResponse;
-      });
+      return response || fetch(request);
     }),
   );
 });
